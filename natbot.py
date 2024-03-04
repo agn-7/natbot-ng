@@ -1,15 +1,12 @@
-#!/usr/bin/env python3
-#
-# natbot.py
-#
-# Set OPENAI_API_KEY to your API key, and then run this from a terminal.
-#
+import time
+import os
+
+from sys import argv, exit, platform
+from typing import List, Literal, Union
+from dataclasses import dataclass
 
 from playwright.sync_api import sync_playwright
-import time
-from sys import argv, exit, platform
-import openai
-import os
+from openai import OpenAI
 
 quiet = False
 if len(argv) >= 2:
@@ -559,6 +556,7 @@ class Crawler:
 
 if __name__ == "__main__":
     _crawler = Crawler()
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
     def print_help():
         print(
@@ -570,6 +568,15 @@ if __name__ == "__main__":
         prompt = prompt_template
         prompt = prompt.replace("$url", url[:100])
         prompt = prompt.replace("$browser_content", browser_content[:4500])
+        response = client.chat.completions.create(
+            model="gpt-4-1106-preview",
+            messages=messages,
+            temperature=0.5,
+            # best_of=10,
+            # n=3,
+            # max_tokens=50,
+        )
+        return response.choices[0].message.content
 
     def run_cmd(cmd):
         cmd = cmd.split("\n")[0]
