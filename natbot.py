@@ -8,6 +8,25 @@ from dataclasses import dataclass
 from playwright.sync_api import sync_playwright
 from openai import OpenAI
 
+
+@dataclass
+class MessageCreate:
+    content: Union[str, dict]
+    role: Literal["system", "user", "assistant"] = "user"
+
+
+@dataclass
+class Instruction:
+    role: Literal["system"] = "system"
+    prompt: str = "You are an assistant."
+
+
+@dataclass
+class PreviousCommands:
+    previous_ai_response: str | None = None
+    previous_user_prompt: str | None = None
+
+
 quiet = False
 if len(argv) >= 2:
     if argv[1] == "-q" or argv[1] == "--quiet":
@@ -149,10 +168,7 @@ CURRENT BROWSER CONTENT:
 $browser_content
 ------------------
 
-OBJECTIVE: $objective
 CURRENT URL: $url
-PREVIOUS COMMAND: $previous_command
-YOUR COMMAND:
 """
 
 black_listed_elements = set(
@@ -554,6 +570,25 @@ class Crawler:
         print("Parsing time: {:0.2f} seconds".format(time.time() - start))
         return elements_of_interest
 
+    def prepare_messages(
+        self,
+        user_content: str,
+        instruction: Instruction,
+        previous_commands: PreviousCommands,
+    ) -> list[MessageCreate]:
+        messages = []
+        messages.append({"role": "system", "content": instruction})
+        messages.append(
+            {"role": "user", "content": previous_commands.previous_user_prompt}
+        ) if previous_commands.previous_user_prompt else None
+        messages.append(
+            {"role": "assistant", "content": previous_commands.previous_ai_response}
+        ) if previous_commands.previous_ai_response else None
+        messages.append({"role": "user", "content": user_content})
+
+        return messages
+
+
 if __name__ == "__main__":
     _crawler = Crawler()
     client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
@@ -564,10 +599,20 @@ if __name__ == "__main__":
             + "(h) to view commands again\n(r/enter) to run suggested command\n(o) change objective"
         )
 
-    def get_gpt_command(objective, url, previous_command, browser_content):
+    def get_gpt_command(
+        objective, url, previous_commands: PreviousCommands, browser_content
+    ) -> str:
         prompt = prompt_template
+        # prompt = prompt.replace("$objective", objective)
         prompt = prompt.replace("$url", url[:100])
+        # prompt = prompt.replace("$previous_command", previous_command)
         prompt = prompt.replace("$browser_content", browser_content[:4500])
+        messages = _crawler.prepare_messages(
+            user_content=objective,
+            instruction=prompt,
+            previous_commands=previous_commands,
+        )
+
         response = client.chat.completions.create(
             model="gpt-4-1106-preview",
             messages=messages,
@@ -610,14 +655,21 @@ if __name__ == "__main__":
         objective = i
 
     gpt_cmd = ""
-    prev_cmd = ""
+    prev_ai_cmd = ""
+    prev_user_cmd = ""
     _crawler.go_to_page("google.com")
     try:
         while True:
             browser_content = "\n".join(_crawler.crawl())
-            prev_cmd = gpt_cmd
+            prev_ai_cmd = gpt_cmd
+            prev_cmds = PreviousCommands(
+                previous_ai_response=prev_ai_cmd, previous_user_prompt=prev_user_cmd
+            )
             gpt_cmd = get_gpt_command(
-                objective, _crawler.page.url, prev_cmd, browser_content
+                objective,
+                _crawler.page.url,
+                previous_commands=prev_cmds,
+                browser_content=browser_content
             )
             gpt_cmd = gpt_cmd.strip()
 
@@ -653,6 +705,9 @@ if __name__ == "__main__":
                 objective = input("Objective:")
             else:
                 print_help()
+
+            prev_user_cmd = objective  # TODO: Do I need previous user prompt?
+
     except KeyboardInterrupt:
         print("\n[!] Ctrl+C detected, exiting gracefully.")
         exit(0)
