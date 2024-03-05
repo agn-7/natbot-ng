@@ -43,7 +43,7 @@ You are an agent controlling a browser. You are given:
 	(2) the URL of your current web page
 	(3) a simplified text description of what's visible in the browser window (more on that below)
 
-You can issue these commands:
+You MUST issue these commands only not any conversation text:
 	SCROLL UP - scroll up one page
 	SCROLL DOWN - scroll down one page
 	CLICK X - click on a given element. You can only click on links, buttons, and inputs!
@@ -625,6 +625,9 @@ if __name__ == "__main__":
             n=3,
             max_tokens=50,
         )
+        print(1111111111111111)
+        print(response.choices[0].message.content)
+        print(222222222222222222)
         return response.choices[0].message.content
 
     def run_cmd(cmd):
