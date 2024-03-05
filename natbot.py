@@ -224,7 +224,7 @@ class Crawler:
 		for (var i = 0; i < links.length; i++) {
 			links[i].removeAttribute("target");
 		}
-		"""
+		"""  # for keeping window in the same tab, ensuring consistency, and simplicity
         self.page.evaluate(js)
 
         element = self.page_element_buffer.get(int(id))
@@ -282,6 +282,7 @@ class Crawler:
             }
         )
 
+        '''Extracting DOM parts of the page'''
         tree = self.client.send(
             "DOMSnapshot.captureSnapshot",
             {"computedStyles": [], "includeDOMRects": True, "includePaintOrder": True},
@@ -307,9 +308,10 @@ class Crawler:
 
         input_checked = nodes["inputChecked"]
         layout = document["layout"]
-        layout_node_index = layout["nodeIndex"]
+        layout_node_index: list = layout["nodeIndex"]
         bounds = layout["bounds"]
 
+        '''Cursors and HTML Element Text Initialization'''
         cursor = 0
         html_elements_text = []
 
@@ -380,6 +382,7 @@ class Crawler:
 
             return value
 
+        '''Main loop through the DOM tree (nodes)'''
         for index, node_name_index in enumerate(node_names):
             node_parent = parent[index]
             node_name = strings[node_name_index].lower()
@@ -557,6 +560,7 @@ class Crawler:
 
             page_element_buffer[id_counter] = element
 
+            '''Create HTML-like Representation'''
             if inner_text != "":
                 elements_of_interest.append(
                     f"""<{converted_node_name} id={id_counter}{meta}>{inner_text}</{converted_node_name}>"""
@@ -614,12 +618,12 @@ if __name__ == "__main__":
         )
 
         response = client.chat.completions.create(
-            model="gpt-4-1106-preview",
+            model="gpt-4-turbo-preview",
             messages=messages,
             temperature=0.5,
             # best_of=10,
-            # n=3,
-            # max_tokens=50,
+            n=3,
+            max_tokens=50,
         )
         return response.choices[0].message.content
 
